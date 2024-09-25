@@ -291,6 +291,118 @@ void loop()
 ## APP分析
 ### 图片APP
 
+#### **初始化**
+```C++
+static int picture_init(AppController *sys)
+{
+	//初始化一个img对象并添加样式
+    photo_gui_init();
+    /*初始化运行参数*/
+    read_config(&cfg_data);
+    run_data = (PictureAppRunData *)malloc(sizeof(PictureAppRunData));
+    run_data->pic_perMillis = 0;
+    run_data->image_file = NULL;
+    run_data->pfile = NULL;
+    run_data->image_pos_increate = 1;
+    run_data->image_file = tf.listDir(IMAGE_PATH);
+    if (NULL != run_data->image_file)
+    {
+        run_data->pfile = get_next_file(run_data->image_file->next_node, 1);
+    }
+    /*TJPG库的设置*/
+    // The jpeg image can be scaled by a factor of 1, 2, 4, or 8
+    TJpgDec.setJpgScale(1);//按系数缩放
+    // The decoder must be given the exact name of the rendering function above
+    TJpgDec.setCallback(tft_output);//jpg格式文件用TFT库函数显示
+    return 0;
+}
+```
+#### **运行逻辑**
+```C++
+static void picture_process(AppController *sys,
+                            const ImuAction *act_info)
+{
+    lv_scr_load_anim_t anim_type = LV_SCR_LOAD_ANIM_FADE_ON;
+    //如果是退出就由controller调用图片APP的退出函数
+    if (RETURN == act_info->active)
+    {
+        sys->app_exit();
+        return;
+    }
+    //image_pos_increate控制图片文件的寻找方向
+    //refreshFlag意味着本次运行中是否要显示其他图片
+    if (TURN_RIGHT == act_info->active)
+    {
+        anim_type = LV_SCR_LOAD_ANIM_OVER_RIGHT;
+        run_data->image_pos_increate = 1;
+        run_data->refreshFlag = true;
+    }
+    else if (TURN_LEFT == act_info->active)
+    {
+        anim_type = LV_SCR_LOAD_ANIM_OVER_LEFT;
+        run_data->image_pos_increate = -1;
+        run_data->refreshFlag = true;
+    }
+    //如果没插SD卡，controller可以调用图片APP的初始化函数
+    //但是每次运行到这都会退出，所以实际上看起来就是压根没有进入APP
+    if (NULL == run_data->image_file)
+    {
+        sys->app_exit();
+        return;
+    }
+
+    // 自动切换的时间检测
+    if (0 != run_data->image_pos_increate &&
+        0 != cfg_data.switchInterval &&
+        GET_SYS_MILLIS() - run_data->pic_perMillis >= cfg_data.switchInterval)
+    {
+        run_data->refreshFlag = true;
+    }
+    //刷新显示
+    //.jpg格式图片用TJPG库解码并用TFT库函数显示
+    //.bin格式图片用LVGL库函数显示
+    if (true == run_data->refreshFlag)
+    {
+        if (NULL != run_data->image_file)
+        {
+            run_data->pfile = get_next_file(run_data->pfile,
+                                            run_data->image_pos_increate);
+        }
+        if (NULL != strstr(file_name, ".jpg") || NULL != strstr(file_name, ".JPG"))
+        {
+            // 直接解码jpg格式的图片
+            TJpgDec.drawSdJpg(0, 0, file_name);
+        }
+        else if (NULL != strstr(file_name, ".bin") || NULL != strstr(file_name, ".BIN"))
+        {
+            // 使用LVGL的bin格式的图片
+            display_photo(file_name, anim_type);
+        }
+        run_data->refreshFlag = false;
+        // 重置更新的时间标记
+        run_data->pic_perMillis = GET_SYS_MILLIS();
+    }
+    delay(300);
+}
+```
+#### **退出回调**
+```C++
+static int picture_exit_callback(void *param)
+{
+    //清除对象
+    photo_gui_del();
+    // 释放文件名链表
+    release_file_info(run_data->image_file);
+
+    // 释放运行数据
+    if (NULL != run_data)
+    {
+        free(run_data);
+        run_data = NULL;
+    }
+    return 0;
+}
+```
 ### 视频APP
 
 ### 天气APP
@@ -298,6 +410,8 @@ void loop()
 ### 配网APP
 
 
+
+## LVGL
 
 ## 展示
 **视频200M太大上传不到github**
