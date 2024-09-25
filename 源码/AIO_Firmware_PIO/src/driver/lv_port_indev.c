@@ -42,10 +42,9 @@ void lv_port_indev_init(void)
 	 * Encoder
 	 * -----------------*/
 
-
 	 /*Initialize your encoder if you have*/
 	encoder_init();
-	
+
 	/*Register a encoder input device*/
 	lv_indev_drv_init(&indev_drv);
 	indev_drv.type = LV_INDEV_TYPE_ENCODER;

@@ -49,7 +49,7 @@ lv_obj_t * lv_obj_class_create_obj(const lv_obj_class_t * class_p, lv_obj_t * pa
     lv_memset_00(obj, s);
     obj->class_p = class_p;
     obj->parent = parent;
-
+	
     /*Create a screen*/
     if(parent == NULL) {
         LV_TRACE_OBJ_CREATE("creating a screen");

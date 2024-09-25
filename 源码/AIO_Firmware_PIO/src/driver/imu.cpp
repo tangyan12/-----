@@ -1,6 +1,6 @@
 #include "imu.h"
 #include "common.h"
-//动作列表
+
 const char *active_type_info[] = {"TURN_RIGHT", "RETURN",
                                   "TURN_LEFT", "UP",
                                   "DOWN", "GO_FORWORD",
@@ -25,24 +25,28 @@ void IMU::init(uint8_t order, uint8_t auto_calibration,
                SysMpuConfig *mpu_cfg)
 {
     this->setOrder(order); // 设置方向
+    //I2C协议初始化，速率400KHZ
     Wire.begin(IMU_I2C_SDA, IMU_I2C_SCL);
     Wire.setClock(400000);
+    //定时超时时长
     unsigned long timeout = 5000;
     unsigned long preMillis = GET_SYS_MILLIS();
-
+    //获取MPU6050句柄，0X68是设备地址
     mpu = MPU6050(0x68);
+    //测试MPU6050连接，测试不成功直接退出
+    //所谓的测试就是获取ID
+    //感觉这个while和if有点重复
     while (!mpu.testConnection() && !doDelayMillisTime(timeout, &preMillis, false))
         ;
-
     if (!mpu.testConnection())
     {
         Serial.print(F("Unable to connect to MPU6050.\n"));
         return;
     }
-
+	//MPU初始化了，好像要挺长的一段时间
     Serial.print(F("Initialization MPU6050 now, Please don't move.\n"));
     mpu.initialize();
-
+	//获得陀螺仪和加速度设置，默认是读取配置，默认配置全是0
     if (auto_calibration == 0)
     {
         // supply your own gyro offsets here, scaled for min sensitivity
@@ -169,13 +173,10 @@ ImuAction *IMU::getAction(void)
     // 基本方法: 通过对近来的动作数据简单的分析，确定出动作的类型
     ImuAction tmp_info;
     getVirtureMotion6(&tmp_info);
-
-    // Serial.printf("gx = %d\tgy = %d\tgz = %d", tmp_info.v_gx, tmp_info.v_gy, tmp_info.v_gz);
-    // Serial.printf("\tax = %d\tay = %d\taz = %d\n", tmp_info.v_ax, tmp_info.v_ay, tmp_info.v_az);
-
+    
     tmp_info.active = ACTIVE_TYPE::UNKNOWN;
 
-    // 原先判断的只是加速度，现在要加上陀螺仪
+    //根据加速度判断倾斜方向，优先判断左右倾斜
     if (ACTIVE_TYPE::UNKNOWN == tmp_info.active)
     {
         if (tmp_info.v_ay > 4000)
@@ -186,11 +187,6 @@ ImuAction *IMU::getAction(void)
         {
             tmp_info.active = ACTIVE_TYPE::TURN_RIGHT;
         }
-        // else if (tmp_info.v_ay > 1000 || tmp_info.v_ay < -1000)
-        // {
-        //     // 震动检测
-        //     tmp_info.active = ACTIVE_TYPE::SHAKE;
-        // }
     }
 
     if (ACTIVE_TYPE::UNKNOWN == tmp_info.active)
@@ -203,11 +199,6 @@ ImuAction *IMU::getAction(void)
         {
             tmp_info.active = ACTIVE_TYPE::DOWN;
         }
-        // else if (action_info.v_ax > 1000 || action_info.v_ax < -1000)
-        // {
-        //     // 震动检测
-        //     tmp_info.active = ACTIVE_TYPE::SHAKE;
-        // }
     }
 
     // 储存当前检测的动作数据到动作缓冲区中
@@ -215,11 +206,11 @@ ImuAction *IMU::getAction(void)
     int index = act_info_history_ind;
     act_info_history[index] = tmp_info.active;
 
-    // 本次流程的动作识别
+    //isvaild键值是否有效，如果有效上一个还没处理进不去
     if (!action_info.isValid)
     {
         bool isHoldDown = false; // 长按的标志位
-        // 本次流程的动作识别
+        //前两个历史标志
         int second = (index + ACTION_HISTORY_BUF_LEN - 1) % ACTION_HISTORY_BUF_LEN;
         int third = (index + ACTION_HISTORY_BUF_LEN - 2) % ACTION_HISTORY_BUF_LEN;
         // 先识别"短按" （注：不要写成else if）
@@ -245,10 +236,11 @@ ImuAction *IMU::getAction(void)
                 action_info.active = ACTIVE_TYPE::RETURN;
             }
             // 如需左右的长按可在此处添加"else if"的逻辑
-
+			
             if (isHoldDown)
             {
                 // 本次识别为长按，则手动清除识别过的历史数据 避免对下次动作识别的影响
+                //好细节
                 act_info_history[second] = ACTIVE_TYPE::UNKNOWN;
                 act_info_history[third] = ACTIVE_TYPE::UNKNOWN;
             }
@@ -263,7 +255,8 @@ void IMU::getVirtureMotion6(ImuAction *action_info)
     mpu.getMotion6(&(action_info->v_ax), &(action_info->v_ay),
                    &(action_info->v_az), &(action_info->v_gx),
                    &(action_info->v_gy), &(action_info->v_gz));
-
+	//获得XYZ方向坐标和加速度并根据order向量做相应更改
+	//order默认是0，不会执行下面代码
     if (order & X_DIR_TYPE)
     {
         action_info->v_ax = -action_info->v_ax;

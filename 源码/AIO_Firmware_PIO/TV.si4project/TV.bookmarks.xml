@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SourceInsightBookmarks
+	AppVer="4.00.0134"
+	AppVerMinReader="4.00.0009"
+	>
+	<Bookmarks>
+		<Mark
+			Name="0750284125907052904202"
+			Comment="APP结构体"
+			File="src\sys\interface.h"
+			Line="18"
+			Column="0"
+			LineOffset="0"
+			/>
+		<Mark
+			Name="0872295510037052904202"
+			Comment="调度中心文件"
+			File="src\sys\app_controller.h"
+			Line="34"
+			Column="0"
+			LineOffset="0"
+			/>
+	</Bookmarks>
+</SourceInsightBookmarks>
